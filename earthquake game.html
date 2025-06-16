@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地震逃生順序挑戰</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+        .btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .btn:active {
+            transform: translateY(0px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .shake {
+            animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both;
+            transform: translate3d(0, 0, 0);
+        }
+        @keyframes shake {
+          10%, 90% { transform: translate3d(-1px, 0, 0); }
+          20%, 80% { transform: translate3d(2px, 0, 0); }
+          30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+          40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+        /* Style for the SVG stick figure */
+        .stick-figure g {
+            stroke: #374151; /* gray-700 */
+            stroke-width: 4;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+            transition: opacity 0.3s ease-in-out, transform 0.4s ease-in-out;
+        }
+        .stick-figure .hidden-anim {
+            opacity: 0;
+        }
+        .stick-figure #table-group {
+             stroke: #a16207; /* amber-700 */
+             stroke-width: 5;
+        }
+    </style>
+</head>
+<body class="bg-amber-50 text-gray-800 flex items-center justify-center min-h-screen p-4">
+
+    <div id="game-container" class="w-full max-w-lg bg-white rounded-2xl shadow-xl p-6 md:p-8 text-center">
+        
+        <h1 class="text-3xl md:text-4xl font-black text-amber-600 mb-2">地震逃生挑戰</h1>
+        <p class="text-gray-600 mb-6">依序點擊正確的地震保命三步驟！</p>
+
+        <!-- Animation Area -->
+        <div class="w-full h-40 bg-gray-100 rounded-lg mb-6 flex items-center justify-center overflow-hidden p-2">
+            <svg id="animation-svg" viewBox="0 0 200 100" class="stick-figure h-full w-full">
+                <!-- Table -->
+                <g id="table-group">
+                    <line x1="120" y1="50" x2="190" y2="50" />
+                    <line x1="130" y1="50" x2="130" y2="95" />
+                    <line x1="180" y1="50" x2="180" y2="95" />
+                </g>
+                
+                <!-- State: Idle (Standing) -->
+                <g id="anim-idle">
+                    <circle cx="60" cy="40" r="10" fill="#f3f4f6"></circle> <!-- Head -->
+                    <line x1="60" y1="50" x2="60" y2="75" /> <!-- Body -->
+                    <line x1="60" y1="55" x2="45" y2="65" /> <!-- Left Arm -->
+                    <line x1="60" y1="55" x2="75" y2="65" /> <!-- Right Arm -->
+                    <line x1="60" y1="75" x2="45" y2="95" /> <!-- Left Leg -->
+                    <line x1="60" y1="75" x2="75" y2="95" /> <!-- Right Leg -->
+                </g>
+
+                <!-- State: 趴下 (Drop) - On hands and knees -->
+                <g id="anim-drop" class="hidden-anim">
+                    <circle cx="80" cy="70" r="8" fill="#f3f4f6"></circle> <!-- Head -->
+                    <line x1="80" y1="78" x2="80" y2="90" /> <!-- Torso -->
+                    <polyline points="80 80, 70 85, 70 95" /> <!-- Arms -->
+                    <polyline points="80 90, 90 92, 90 98" /> <!-- Legs -->
+                </g>
+
+                <!-- State: 掩護 (Cover) - Under table, covering neck -->
+                <g id="anim-cover" class="hidden-anim">
+                    <circle cx="140" cy="65" r="8" fill="#f3f4f6"></circle> <!-- Head -->
+                    <line x1="140" y1="73" x2="140" y2="85" /> <!-- Torso -->
+                    <polyline points="140 85, 150 87, 150 93" /> <!-- Legs -->
+                    <!-- Arm covering head/neck -->
+                    <path d="M140 75 Q 130 60, 145 60" />
+                </g>
+
+                <!-- State: 穩住 (Hold On) - Under table, holding leg -->
+                <g id="anim-hold" class="hidden-anim">
+                     <circle cx="140" cy="65" r="8" fill="#f3f4f6"></circle> <!-- Head -->
+                     <line x1="140" y1="73" x2="140" y2="85" /> <!-- Torso -->
+                     <polyline points="140 85, 150 87, 150 93" /> <!-- Legs -->
+                     <!-- Arm covering head/neck -->
+                     <path d="M140 75 Q 130 60, 145 60" />
+                     <!-- Arm holding table leg -->
+                     <polyline points="140 75, 132 80, 132 85" />
+                </g>
+            </svg>
+        </div>
+
+        <!-- High Score Display -->
+        <div class="bg-amber-100 rounded-lg p-3 mb-6">
+            <h2 class="text-sm font-bold text-amber-800">最快紀錄</h2>
+            <p id="high-score" class="text-2xl font-bold text-amber-900">-.-- 秒</p>
+        </div>
+        
+        <!-- Game Status Display -->
+        <div id="status-display" class="h-24 flex flex-col items-center justify-center bg-gray-100 rounded-lg mb-6 p-4">
+            <p id="timer" class="text-5xl font-bold tracking-tighter text-gray-700">0.00</p>
+            <p id="message" class="text-lg font-bold text-red-500 h-7 mt-1"></p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div id="choices-container" class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <!-- Buttons will be injected here by JavaScript -->
+        </div>
+
+        <!-- Control Button -->
+        <button id="start-btn" class="btn w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-4 px-4 rounded-lg text-xl shadow-lg">
+            開始遊戲
+        </button>
+
+        <!-- User ID Display -->
+        <div class="mt-6 text-xs text-gray-400">
+            <p>玩家ID: <span id="user-id">正在載入...</span></p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // --- Firebase Configuration ---
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "DEMO", authDomain: "DEMO", projectId: "DEMO" };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'earthquake-game-default';
+        
+        // --- Firebase Initialization ---
+        let app, db, auth, userId;
+        let isAuthReady = false;
+
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+        } catch (e) {
+            console.error("Firebase initialization failed:", e);
+            document.getElementById('message').textContent = '無法連接到伺服器';
+        }
+
+        // --- Authentication ---
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                document.getElementById('user-id').textContent = userId;
+                isAuthReady = true;
+                setupHighScoreListener();
+            } else {
+                try {
+                    const userCredential = await signInAnonymously(auth);
+                    userId = userCredential.user.uid;
+                    document.getElementById('user-id').textContent = userId;
+                    isAuthReady = true;
+                    setupHighScoreListener();
+                } catch (error) {
+                    console.error("Anonymous sign-in failed:", error);
+                    document.getElementById('message').textContent = '認證失敗，無法記錄分數。';
+                    userId = `local_${crypto.randomUUID()}`;
+                    document.getElementById('user-id').textContent = userId;
+                }
+            }
+        });
+
+        // --- Game Elements ---
+        const startBtn = document.getElementById('start-btn');
+        const timerEl = document.getElementById('timer');
+        const messageEl = document.getElementById('message');
+        const choicesContainer = document.getElementById('choices-container');
+        const highScoreEl = document.getElementById('high-score');
+        const gameContainer = document.getElementById('game-container');
+        
+        // --- Animation Elements ---
+        const animElements = {
+            idle: document.getElementById('anim-idle'),
+            drop: document.getElementById('anim-drop'),
+            cover: document.getElementById('anim-cover'),
+            hold: document.getElementById('anim-hold'),
+        };
+        const ANIM_SEQUENCE = ['drop', 'cover', 'hold'];
+
+        // --- Game State ---
+        const CORRECT_SEQUENCE = ['趴下', '掩護', '穩住'];
+        const CHOICES = ['趴下', '掩護', '穩住'];
+        
+        let playerSequence = [];
+        let timerInterval;
+        let startTime;
+        let gameState = 'idle';
+        let highScore = null;
+
+        // --- Firestore High Score Logic ---
+        const highScoreRef = doc(db, `artifacts/${appId}/public/data/highscores`, 'fastest-time');
+
+        function setupHighScoreListener() {
+            if (!isAuthReady) {
+                 console.warn("Auth not ready, skipping high score listener setup.");
+                 return;
+            }
+            onSnapshot(highScoreRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    highScore = data.time;
+                    highScoreEl.textContent = `${highScore.toFixed(2)} 秒`;
+                } else {
+                    console.log("No high score document yet.");
+                }
+            }, (error) => {
+                console.error("Error listening to high scores:", error);
+                highScoreEl.textContent = "讀取錯誤";
+            });
+        }
+
+        async function updateHighScore(newTime) {
+            if (!isAuthReady) {
+                console.warn("Auth not ready, cannot update high score.");
+                return;
+            }
+            if (highScore === null || newTime < highScore) {
+                try {
+                    await setDoc(highScoreRef, { time: newTime, user: userId, updatedAt: new Date() });
+                    console.log("High score updated!");
+                } catch (error) {
+                    console.error("Error setting high score: ", error);
+                }
+            }
+        }
+        
+        // --- Animation Function ---
+        function showAnimation(state) {
+            // Hide all first
+            Object.values(animElements).forEach(el => el.classList.add('hidden-anim'));
+            // Show the correct one
+            if (animElements[state]) {
+                animElements[state].classList.remove('hidden-anim');
+            }
+        }
+
+        // --- Game Functions ---
+        function resetGame() {
+            gameState = 'idle';
+            playerSequence = [];
+            clearInterval(timerInterval);
+            timerEl.textContent = '0.00';
+            messageEl.textContent = '';
+            startBtn.textContent = '開始遊戲';
+            startBtn.disabled = false;
+            choicesContainer.innerHTML = '';
+            renderChoiceButtons();
+            showAnimation('idle'); // Reset to standing animation
+        }
+
+        function startGame() {
+            resetGame();
+            gameState = 'playing';
+            startBtn.disabled = true;
+            startBtn.textContent = '遊戲進行中...';
+            startTime = Date.now();
+            timerInterval = setInterval(updateTimer, 10);
+            showAnimation('idle');
+        }
+
+        function updateTimer() {
+            const elapsedTime = (Date.now() - startTime) / 1000;
+            timerEl.textContent = elapsedTime.toFixed(2);
+        }
+
+        function renderChoiceButtons() {
+            choicesContainer.innerHTML = '';
+            const shuffledChoices = [...CHOICES].sort(() => Math.random() - 0.5);
+            shuffledChoices.forEach(choice => {
+                const button = document.createElement('button');
+                button.textContent = choice;
+                button.dataset.choice = choice;
+                button.className = 'btn w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-4 rounded-lg text-lg';
+                button.onclick = handleChoiceClick;
+                choicesContainer.appendChild(button);
+            });
+        }
+        
+        function handleChoiceClick(event) {
+            if (gameState !== 'playing') return;
+
+            const selectedChoice = event.target.dataset.choice;
+            const expectedChoice = CORRECT_SEQUENCE[playerSequence.length];
+
+            if (selectedChoice === expectedChoice) {
+                playerSequence.push(selectedChoice);
+                messageEl.textContent = `正確！下一個是...`;
+                messageEl.className = 'text-lg font-bold text-green-600 h-7 mt-1';
+                
+                event.target.classList.remove('bg-gray-200', 'hover:bg-gray-300');
+                event.target.classList.add('bg-green-500', 'text-white');
+                event.target.disabled = true;
+
+                // Update animation to the current correct step
+                const currentAnimStep = playerSequence.length - 1;
+                showAnimation(ANIM_SEQUENCE[currentAnimStep]);
+
+                if (playerSequence.length === CORRECT_SEQUENCE.length) {
+                    winGame();
+                }
+            } else {
+                messageEl.textContent = '錯誤！請從頭開始！';
+                messageEl.className = 'text-lg font-bold text-red-500 h-7 mt-1';
+                gameContainer.classList.add('shake');
+                setTimeout(() => gameContainer.classList.remove('shake'), 820);
+                
+                playerSequence = [];
+                renderChoiceButtons();
+                showAnimation('idle'); // Reset animation on error
+            }
+        }
+
+        function winGame() {
+            gameState = 'won';
+            clearInterval(timerInterval);
+            const finalTime = (Date.now() - startTime) / 1000;
+            timerEl.textContent = finalTime.toFixed(2);
+            messageEl.textContent = `恭喜！你完成了！`;
+            messageEl.className = 'text-lg font-bold text-amber-600 h-7 mt-1';
+
+            startBtn.textContent = '再玩一次';
+            startBtn.disabled = false;
+            
+            updateHighScore(finalTime);
+        }
+
+        // --- Event Listeners ---
+        startBtn.addEventListener('click', () => {
+            if (gameState === 'idle' || gameState === 'won') {
+                startGame();
+            }
+        });
+
+        // --- Initial Setup ---
+        window.onload = () => {
+            resetGame();
+        };
+    </script>
+</body>
+</html>
